@@ -2,12 +2,8 @@ package com.example.fermi.fermi;
 
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
-import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -15,7 +11,6 @@ import android.support.v4.content.res.ResourcesCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -28,11 +23,8 @@ import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.UserProfileChangeRequest;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
 
 public class Signup2Activity extends AppCompatActivity {
 
@@ -73,21 +65,6 @@ public class Signup2Activity extends AppCompatActivity {
         Nextbtn.setEnabled(false);
         drawable = (GradientDrawable) Nextbtn.getBackground();
         drawable.setStroke(4, getResources().getColor(R.color.colorPrimaryLight));
-/*
-        final Handler handler = new Handler();
-        Timer timer = new Timer();
-        TimerTask doAsynchronousTask = new TimerTask() {
-            @Override
-            public void run() {
-                handler.post(new Runnable() {
-                    @SuppressWarnings("unchecked")
-                    public void run() {
-                        isOnline();
-                    }
-                });
-            }
-        };
-        timer.schedule(doAsynchronousTask, 0, 5000);*/
 
         FullName.addTextChangedListener(new TextWatcher() {
             @Override
@@ -154,112 +131,98 @@ public class Signup2Activity extends AppCompatActivity {
                     progressDialog.setMessage("Registering Please Wait...");
                     progressDialog.show();
 
-                    try {
-                        firebaseAuth.createUserWithEmailAndPassword(email, Password.getText().toString().trim())
-                                .addOnCompleteListener(Signup2Activity.this, new OnCompleteListener<AuthResult>() {
-                                    @Override
-                                    public void onComplete(@NonNull Task<AuthResult> task) {
-                                        if (task.isSuccessful()) {
+                    firebaseAuth.createUserWithEmailAndPassword(email, Password.getText().toString().trim())
+                            .addOnCompleteListener(Signup2Activity.this, new OnCompleteListener<AuthResult>() {
+                                @Override
+                                public void onComplete(@NonNull Task<AuthResult> task) {
+                                    //checking if success
+                                    if(task.isSuccessful()){
+                                        final User user =  new User();
+                                        user.setName(FullName.getText().toString());
+                                        user.setEmail(email);
+                                        user.setUdid(firebaseAuth.getCurrentUser().getUid());
+                                        user.setProfile(downloadUrl);
 
-                                            Log.d("SIGNUP ACTIVITY 2", "createUserWithEmail:success"+mDatabase.child("users").child(firebaseAuth.getCurrentUser().getUid()));
+                                        UserProfileChangeRequest profileUpdates;
 
-                                            mDatabase.child("users").child(firebaseAuth.getCurrentUser().getUid()).addListenerForSingleValueEvent(new ValueEventListener() {
-                                                @Override
-                                                public void onDataChange(DataSnapshot dataSnapshot) {
+                                        if (downloadUrl != null && !downloadUrl.isEmpty()) {
+                                            profileUpdates = new UserProfileChangeRequest.Builder()
+                                                    .setDisplayName(user.getName().trim())
+                                                    .setPhotoUri(Uri.parse(downloadUrl))
+                                                    .build();
+                                        }
+                                        else {
+                                            profileUpdates = new UserProfileChangeRequest.Builder()
+                                                    .setDisplayName(user.getName().trim())
+                                                    .build();
+                                        }
 
-                                                    Log.d("SIGNUP ACTIVITY 2", "createUserWithEmail:success no");
-                                                    final User user = (dataSnapshot.getValue(User.class) != null) ? dataSnapshot.getValue(User.class) : new User();
-                                                    user.setName(FullName.getText().toString());
-                                                    user.setEmail(email);
-                                                    user.setUdid(firebaseAuth.getCurrentUser().getUid());
-                                                    user.setProfile(downloadUrl);
-                                                    UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
-                                                            .setDisplayName(user.getName().trim())
-                                                            .setPhotoUri(Uri.parse(downloadUrl))
-                                                            .build();
+                                        FirebaseAuth.getInstance().getCurrentUser().updateProfile(profileUpdates).addOnCompleteListener(new OnCompleteListener<Void>() {
+                                            @Override
+                                            public void onComplete(@NonNull Task<Void> task) {
 
-                                                    FirebaseAuth.getInstance().getCurrentUser().updateProfile(profileUpdates).addOnCompleteListener(new OnCompleteListener<Void>() {
-                                                        @Override
-                                                        public void onComplete(@NonNull Task<Void> task) {
-                                                            mDatabase.child("users").child(firebaseAuth.getCurrentUser().getUid()).setValue(user);
-                                                            //  mDatabase.child("Message Number").setValue(new MessageNumber(0));
-                                                            progressDialog.dismiss();
-                                                            startActivity(new Intent(Signup2Activity.this, GetProfileActivity.class));
-                                                            Signup2Activity.this.finish();
-                                                        }
-                                                    });
-                                                }
-
-                                                @Override
-                                                public void onCancelled(DatabaseError databaseError) {
-                                                    Log.d("SIGNUP ACTIVITY 2", "createUserWithEmail:success no1");
-                                                }
-                                            });
-
-                                            return;
-                                        } else {
-                                            progressDialog.dismiss();
-
-                                            String message = "The email address is already in use by another account.";
-
-                                            if (task.getException().getMessage().equals(message)) {
-
-                                                AlertDialog.Builder alert = new AlertDialog.Builder(Signup2Activity.this);
-                                                alert.setTitle("Sign up");
-                                                alert.setMessage(message);
-                                                alert.setPositiveButton("OK", null);
-                                                alert.show();
-
-                                            } else {
-                                                AlertDialog.Builder alert = new AlertDialog.Builder(Signup2Activity.this);
-                                                alert.setTitle("Sign up");
-                                                alert.setMessage("Email is invalid or password contains less than 6 symbols");
-                                                alert.setPositiveButton("OK", null);
-                                                alert.show();
+                                                mDatabase.child("users").child(firebaseAuth.getCurrentUser().getUid()).setValue(user);
+                                                //  mDatabase.child("Message Number").setValue(new MessageNumber(0));
+                                                progressDialog.dismiss();
+                                                startActivity(new Intent(Signup2Activity.this, GetProfileActivity.class));
+                                                Signup2Activity.this.finish();
                                             }
+                                        });
+                                    }else{
+
+                                        String message = "The email address is already in use by another account.";
+
+                                        if (task.getException().getMessage().equals(message)) {
+
+                                            AlertDialog.Builder alert = new AlertDialog.Builder(Signup2Activity.this);
+                                            alert.setTitle("Sign up");
+                                            alert.setMessage(message);
+                                            alert.setPositiveButton("OK", null);
+                                            alert.show();
+
+                                        } else {
+                                            AlertDialog.Builder alert = new AlertDialog.Builder(Signup2Activity.this);
+                                            alert.setTitle("Sign up");
+                                            alert.setMessage("Email is invalid or password contains less than 6 symbols");
+                                            alert.setPositiveButton("OK", null);
+                                            alert.show();
                                         }
                                     }
-                                }).addOnFailureListener(new OnFailureListener() {
-                            @Override
-                            public void onFailure(@NonNull Exception e) {
-                                if (e instanceof FirebaseNetworkException) {
-                                    AlertDialog.Builder alert = new AlertDialog.Builder(Signup2Activity.this);
-                                    alert.setTitle("Sign up");
-                                    alert.setMessage("Please Check Your Connection");
-                                    alert.setPositiveButton("OK", null);
-                                    alert.show();
-                                    //  Toast.makeText(LoginActivity.this, "Please Check Your Connection", Toast.LENGTH_SHORT).show();
+                                    progressDialog.dismiss();
                                 }
-                            }
-                        });
-
-                    }catch (Exception e){
-                        progressDialog.setMessage(e.getMessage());
-                        progressDialog.show();
+                            }).addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        if (e instanceof FirebaseNetworkException) {
+                            AlertDialog.Builder alert = new AlertDialog.Builder(Signup2Activity.this);
+                            alert.setTitle("Sign up");
+                            alert.setMessage("Please Check Your Connection");
+                            alert.setPositiveButton("OK", null);
+                            alert.show();
+                            //  Toast.makeText(LoginActivity.this, "Please Check Your Connection", Toast.LENGTH_SHORT).show();
+                        }
                     }
-
-
+                });
 
                 }
             }
         });
-
     }
 
-    public boolean isOnline() {
+  /*  public boolean isOnline() {
         ConnectivityManager cm =
                 (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo netInfo = cm.getActiveNetworkInfo();
 
         if (netInfo != null && netInfo.isConnectedOrConnecting()) {
             alertDialog.dismiss();
-            /*Toast.makeText(MainActivity.this,"Internet connection available  ",
-                    Toast.LENGTH_SHORT).show();*/
+            *//*Toast.makeText(MainActivity.this,"Internet connection available  ",
+                    Toast.LENGTH_SHORT).show();*//*
             return true;
         }
         ;
-       /* Toast.makeText(MainActivity.this,"No Internet connection available  ",
-                Toast.LENGTH_SHORT).show();*/
+       *//* Toast.makeText(MainActivity.this,"No Internet connection available  ",
+                Toast.LENGTH_SHORT).show();*//*
 
         alertDialog.setTitle("Network");
 
@@ -277,5 +240,5 @@ public class Signup2Activity extends AppCompatActivity {
         alertDialog.show();
         return false;
     }
-
+*/
 }
